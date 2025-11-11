@@ -4,7 +4,7 @@
 
 ---
 
-## TL;DR (copy–paste run)
+## TL;DR
 
 **Windows (PowerShell / Conda Prompt)**
 
@@ -18,20 +18,6 @@ python scripts\debug_check.py --task clf --classes 3 --mode signal --rows 1500 -
 python scripts\debug_check.py --task reg --mode signal --rows 1200 --seed 42 --train-size 0.7 --plots fi,resid,pred,qq,hist --bronze-dir data\bronze --silver-dir data\silver --reports-dir reports
 ```
 
-**Git workflow (feature branch → PR)**
-
-```bash
-git fetch origin
-git switch main && git pull
-git switch -c feat/full-publish-debug-check
-# run the two commands above to generate artifacts
-conda env export -n citybikes-311 --from-history > environment.yml
-python -m pip freeze > requirements.txt
-git add -A
-git commit -m "feat: publish debug_check pipeline + artifacts + env files"
-git push -u origin feat/full-publish-debug-check
-# then open PR on GitHub and merge after review
-```
 
 ---
 
