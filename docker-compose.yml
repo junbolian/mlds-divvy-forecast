@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16
+    container_name: divvy_postgres
+    environment:
+      POSTGRES_DB: divvy
+      POSTGRES_USER: divvy
+      POSTGRES_PASSWORD: divvy
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: divvy_app
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: divvy
+      DB_USER: divvy
+      DB_PASSWORD: divvy
+      DIVVY_API_URL: "https://api.citybik.es/v2/networks/divvy"
+    working_dir: /app
+    volumes:
+      - .:/app
+    # Keep container alive; commands are run via `docker compose exec app ...`
+    command: ["sleep", "infinity"]
+
+volumes:
+  pgdata:

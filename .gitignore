@@ -1,4 +1,18 @@
-data/
-reports/
-models_store/
-outputs/plots/
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual envs
+.venv/
+env/
+venv/
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# Outputs (generated artifacts)
+outputs/
+
+# Docker junk
+*.log
