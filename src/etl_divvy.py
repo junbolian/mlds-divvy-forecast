@@ -157,6 +157,12 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
         )
 
         # 5) fact_station_status row
+        available_total = (
+            free_bikes + empty_slots
+            if free_bikes is not None and empty_slots is not None
+            else None
+        )
+
         status_fact_rows.append(
             {
                 "station_id": station_id,
@@ -165,8 +171,8 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
                 "empty_slots": empty_slots,
                 "capacity": capacity,
                 "occupancy_ratio": (
-                    float(free_bikes) / capacity
-                    if capacity and free_bikes is not None
+                    float(free_bikes) / available_total
+                    if available_total not in (None, 0)
                     else None
                 ),
                 "status_label": status_label,
@@ -174,6 +180,7 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
                 "raw_extra": extra,
             }
         )
+
 
     return {
         "stations_dim_rows": stations_dim_rows,
