@@ -5,6 +5,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from sklearn.metrics import precision_recall_curve
 
 import numpy as np
 import pandas as pd
@@ -81,113 +82,241 @@ def parse_plots(arg: str | None) -> set[str]:
     return {p.strip().lower() for p in arg.split(",") if p.strip()}
 
 # ------------ data gen ------------
+# This function generates a fake regression dataset so we can test our end-to-end pipeline.
+# In ‘signal’ mode the target depends on the features, and in ‘noise’ mode it doesn’t — letting us test both meaningful and random data.”
 def gen_regression(rows: int, mode: str, seed: int) -> pd.DataFrame:
+    # Initialize a random number generator for reproducibility
     rng = np.random.default_rng(seed)
+
+    # Generate three input features:
+    # f1 and f2 come from a standard normal distribution (mean 0, std 1)
     f1 = rng.normal(0, 1, rows)
     f2 = rng.normal(0, 1, rows)
+
+    # f3 is drawn from a uniform distribution between -2 and 2
     f3 = rng.uniform(-2, 2, rows)
+
+    # Generate the target variable y
     if mode == "signal":
+        # In "signal" mode, y has a meaningful relationship to the features.
+        # y = 3*f1 - 2*f2 + nonlinear effect of sin(f3) + random noise
         y = 3.0 * f1 - 2.0 * f2 + 3.0 * np.sin(f3) + rng.normal(0, 0.7, rows)
     else:
+        # In "noise" mode, y is purely random and unrelated to the features
         y = rng.normal(0, 1.5, rows)
     return pd.DataFrame({"f1": f1, "f2": f2, "f3": f3, "y": y})
 
+# “This function generates a synthetic classification dataset.
+# In ‘signal’ mode, the features contain real structure that helps predict the class label.
+# In ‘noise’ mode, everything is random so the labels cannot be predicted.
+# We use this synthetic data to test our pipeline (bronze → silver → analysis) before connecting it to the real Divvy API.”
 def gen_classification(rows: int, classes: int, mode: str, seed: int) -> pd.DataFrame:
+    # Initialize a random number generator for reproducibility
     rng = np.random.default_rng(seed)
+
+    # If "signal" mode: generate a dataset with meaningful class structure
     if mode == "signal":
+        # make_classification generates features that are predictive of the class label
         X, y = make_classification(
-            n_samples=rows, n_features=3, n_informative=3, n_redundant=0,
-            n_classes=classes, n_clusters_per_class=1, flip_y=0.02, random_state=seed
+            n_samples=rows, # number of rows to generate
+            n_features=3, # total number of features
+            n_informative=3, # all 3 features contain predictive information
+            n_redundant=0, # no redundant/duplicate features
+            n_classes=classes, # number of classes to generate
+            n_clusters_per_class=1, # each class comes from one cluster
+            flip_y=0.02, # small amount of label noise (2%)
+            random_state=seed
         )
+
+        # Convert features into a DataFrame
         df = pd.DataFrame(X, columns=["f1", "f2", "f3"])
+        # Add the class label column
         df["label"] = y
+
+    # If "noise" mode: generate a dataset with NO meaningful structure
     else:
+        # Features are pure random noise from a normal distribution
         f1 = rng.normal(0, 1, rows)
         f2 = rng.normal(0, 1, rows)
         f3 = rng.normal(0, 1, rows)
+
+        # Labels are random integers between 0 and (classes - 1)
+        # Meaning the model cannot learn anything because nothing relates to the features
         y = rng.integers(0, classes, size=rows)
+
+        # Construct the DataFrame
         df = pd.DataFrame({"f1": f1, "f2": f2, "f3": f3, "label": y})
     return df
 
+# Convert that CSV into a Parquet file
 def bronze_to_silver(bronze_csv: str, silver_parquet: str) -> dict:
+    # Read the raw bronze data from a CSV file
     df = pd.read_csv(bronze_csv)
+    # Ensure the directory for the silver Parquet file exists
     Path(silver_parquet).parent.mkdir(parents=True, exist_ok=True)
+    # Write the DataFrame to a Parquet file (efficient columnar format)
     df.to_parquet(silver_parquet, index=False)
+    # Return metadata about the transformation
     return {"rows": int(df.shape[0]), "parquet": normp(silver_parquet)}
 
 # ------------ plots (reg) ------------
 def plot_feature_importance(names, imps, out_png, top: int = 30):
+    # Sort feature importances in descending order
+    # np.argsort(-imps) gives indices from most → least important
+    # [:top] keeps only the top N features (default = 30)
     order = np.argsort(-imps)[:top]
+
+    # Create a new figure with a defined size
     plt.figure(figsize=(6, 4))
+
+    # Plot a horizontal bar chart of the top feature importances
+    # We reverse the order ([::-1]) so the most important feature appears at the top
     plt.barh(np.array(names)[order][::-1], imps[order][::-1])
-    plt.xlabel("Importance"); plt.ylabel("Feature"); plt.title("Feature Importance")
+
+    # Label the axes and set the plot title
+    plt.xlabel("Importance")
+    plt.ylabel("Feature")
+    plt.title("Feature Importance")
     save_fig(out_png)
 
 def plot_pred_vs_true(y_true, y_pred, out_png):
+    # Create a square figure for the scatter plot
     plt.figure(figsize=(5, 5))
+    # Plot predicted values vs. true values. Each point represents one observation
     plt.scatter(y_true, y_pred, s=10, alpha=0.6)
+
+    # Determine the range for the diagonal "perfect prediction" line
+    # We use the min and max of both true and predicted values to match plot scale
     lims = [min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())]
+
+    # Draw a 45-degree reference line (perfect predictions)
+    # If the model is perfect, all points fall on this line
     plt.plot(lims, lims)
-    plt.xlabel("True"); plt.ylabel("Pred"); plt.title("Predicted vs. True")
+
+    # Add axis labels and a title for clarity
+    plt.xlabel("True")
+    plt.ylabel("Pred")
+    plt.title("Predicted vs. True")
     save_fig(out_png)
 
+
 def plot_residuals(y_true, y_pred, out_png):
+    # Calculate residuals (error = actual - predicted)
     resid = y_true - y_pred
+    # Create a new figure for the residual plot
     plt.figure(figsize=(6, 4))
+    # Scatter plot of residuals vs predicted values. Each point is one prediction
     plt.scatter(y_pred, resid, s=10, alpha=0.6)
+    # Draw a horizontal line at 0 to show where residuals should ideally center
     plt.axhline(0.0)
-    plt.xlabel("Pred"); plt.ylabel("Residual"); plt.title("Residuals vs. Fitted")
+    # Label axes and title for interpretation
+    plt.xlabel("Pred")
+    plt.ylabel("Residual")
+    plt.title("Residuals vs. Fitted")
+    # Save the plot to the specified output path
     save_fig(out_png)
 
 def plot_residual_hist(y_true, y_pred, out_png):
+    # Calculate residuals (actual - predicted)
     resid = y_true - y_pred
+    # Create a new figure for the histogram
     plt.figure(figsize=(6, 4))
+    # Plot a histogram of residual values, bins=30 creates a smooth distribution, alpha=0.9 sets slight transparency
     plt.hist(resid, bins=30, alpha=0.9)
-    plt.xlabel("Residual"); plt.ylabel("Count"); plt.title("Residual Histogram")
+    # Label axes and add a title for clarity
+    plt.xlabel("Residual")
+    plt.ylabel("Count")
+    plt.title("Residual Histogram")
+    # Save the plot to the specified output path
     save_fig(out_png)
 
 def plot_qq(y_true, y_pred, out_png):
+    # Calculate residuals (error = actual - predicted)
     resid = y_true - y_pred
+    # Create a new figure for the histogram
     plt.figure(figsize=(5, 5))
+    # Generate a Q-Q plot comparing residuals to a normal distribution
+    # If residuals are normally distributed, points will lie close to the line
     stats.probplot(resid, dist="norm", plot=plt)
+    # Add a title for clarity
     plt.title("Residual QQ Plot")
+    # Save the plot to the specified output path
     save_fig(out_png)
 
 # ------------ plots (clf) ------------
 def plot_confusion(cm: np.ndarray, classes: list[int], out_png: str):
+    # Create a figure for the confusion matrix visualization
     plt.figure(figsize=(5, 4))
+    # Display the confusion matrix as an image, 'nearest' interpolation keeps the blocky matrix look
     plt.imshow(cm, interpolation="nearest")
+    # Add a title so the plot is clearly labeled
     plt.title("Confusion Matrix")
+    # Display a color bar to show intensity of counts
     plt.colorbar()
+    # Set tick locations for class labels (0, 1, 2, ...)
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes); plt.yticks(tick_marks, classes)
-    plt.xlabel("Predicted"); plt.ylabel("True")
+    # Apply class labels to x- and y-axis ticks
+    # x-axis = predicted labels
+    # y-axis = true labels
+    plt.xticks(tick_marks, classes)
+    plt.yticks(tick_marks, classes)
+    # Label the axes
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    # Save the plot to the specified output path
     save_fig(out_png)
 
 def plot_roc_multiclass(y_true: np.ndarray, proba: np.ndarray, out_png: str):
+    # Number of classes (each column of proba corresponds to one class)
     n_classes = proba.shape[1]
+    # Convert true labels into one-hot encoded format. Example: class 2 becomes [0, 0, 1, 0, ...]
     y_bin = np.eye(n_classes)[y_true]
+    # Create a figure for the ROC curves
     plt.figure(figsize=(6, 5))
+    # Loop over each class to compute a ROC curve
+
     for k in range(n_classes):
+        # Compute false positive rate (FPR) and true positive rate (TPR) for class k vs. all other classes (one-vs-rest)
         fpr, tpr, _ = roc_curve(y_bin[:, k], proba[:, k])
+        # Calculate the AUC (area under the ROC curve)
         roc_auc = auc(fpr, tpr)
+        # Plot the ROC curve for this class
         plt.plot(fpr, tpr, label=f"Class {k} AUC={roc_auc:.3f}")
+
+    # Add the diagonal "no-skill" reference line
     plt.plot([0, 1], [0, 1], linestyle="--")
-    plt.xlabel("FPR"); plt.ylabel("TPR"); plt.title("ROC (OvR)")
+    # Label axes and add a title
+    plt.xlabel("FPR")
+    plt.ylabel("TPR")
+    plt.title("ROC (OvR)")
+    # Add legend with class-wise AUC values
     plt.legend(fontsize=8)
+    # Save the ROC plot to a file
     save_fig(out_png)
 
 def plot_pr_multiclass(y_true: np.ndarray, proba: np.ndarray, out_png: str):
+    # Number of classes (each column in proba corresponds to one class)
     n_classes = proba.shape[1]
+    # Convert true labels into one-hot encoded format. Example: class 1 → [0, 1, 0, 0, ...]
     y_bin = np.eye(n_classes)[y_true]
+    # Create a new figure for the Precision-Recall curves
     plt.figure(figsize=(6, 5))
-    from sklearn.metrics import precision_recall_curve
+
+    # Loop through each class to compute a separate PR curve
     for k in range(n_classes):
+        # Calculate precision and recall for class k (one-vs-rest)
         prec, rec, _ = precision_recall_curve(y_bin[:, k], proba[:, k])
+        # Compute the area under the PR curve
         pr_auc = auc(rec, prec)
+        # Plot the PR curve for this class
         plt.plot(rec, prec, label=f"Class {k} AUC={pr_auc:.3f}")
-    plt.xlabel("Recall"); plt.ylabel("Precision"); plt.title("PR Curve (OvR)")
+    # Label axes and set a title
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title("PR Curve (OvR)")
+    # Add legend showing AUC for each class
     plt.legend(fontsize=8)
+    # Add legend showing AUC for each class
     save_fig(out_png)
 
 # ------------ fitters ------------
