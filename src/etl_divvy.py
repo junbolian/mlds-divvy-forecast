@@ -169,7 +169,6 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
                 "timestamp_utc": ts,
                 "free_bikes": free_bikes,
                 "empty_slots": empty_slots,
-                "capacity": capacity,
                 "occupancy_ratio": (
                     float(free_bikes) / available_total
                     if available_total not in (None, 0)
