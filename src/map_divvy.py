@@ -19,8 +19,8 @@ def status_to_color(status: str) -> str:
     """
     mapping: Dict[str, str] = {
         "empty": "red",
-        "full": "darkblue",
-        "normal": "green",
+        "full": "green",
+        "normal": "yellow",
         "offline": "gray",
         "unknown": "lightgray",
     }
