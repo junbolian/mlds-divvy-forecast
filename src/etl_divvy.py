@@ -124,12 +124,12 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
 
         # 2) capacity: prefer extra["slots"]; fallback to free + empty
         slots = extra.get("slots")
-        if isinstance(slots, int) and slots > 0:
-            capacity = slots
-        else:
-            fb = free_bikes if isinstance(free_bikes, int) and free_bikes >= 0 else 0
-            es = empty_slots if isinstance(empty_slots, int) and empty_slots >= 0 else 0
-            capacity = fb + es if fb + es > 0 else None
+        # 2) capacity: always free_bikes + empty_slots
+        fb = free_bikes if isinstance(free_bikes, int) and free_bikes >= 0 else 0
+        es = empty_slots if isinstance(empty_slots, int) and empty_slots >= 0 else 0
+        
+        capacity = fb + es if (free_bikes is not None and empty_slots is not None) else None
+
 
         # renting / returning flags (default to 1 if missing)
         renting = int(extra.get("renting", 1) or 1)
@@ -157,20 +157,16 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
         )
 
         # 5) fact_station_status row
-        available_total = (
-            free_bikes + empty_slots
-            if free_bikes is not None and empty_slots is not None
-            else None
-        )
-
+        
         status_fact_rows.append(
             {
                 "station_id": station_id,
                 "timestamp_utc": ts,
                 "free_bikes": free_bikes,
                 "empty_slots": empty_slots,
+                "capacity": capacity,  
                 "occupancy_ratio": (
-                    float(free_bikes) / available_total
+                    float(free_bikes) / capacity
                     if available_total not in (None, 0)
                     else None
                 ),
