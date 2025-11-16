@@ -190,6 +190,29 @@ def create_divvy_map(
         ).add_to(folium_map)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # Add legend box
+    legend_html = """
+    <div style="
+        position: fixed; 
+        bottom: 50px; left: 50px; width: 180px; z-index: 9999;
+        background-color: white;
+        border: 2px solid grey;
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 14px;
+    ">
+    <b>Station Status Legend</b><br>
+    <span style="color:red;">&#9679;</span> Empty<br>
+    <span style="color:green;">&#9679;</span> Full<br>
+    <span style="color:yellow;">&#9679;</span> Normal<br>
+    <span style="color:gray;">&#9679;</span> Offline<br>
+    <span style="color:lightgray;">&#9679;</span> Unknown
+    </div>
+    """
+
+    folium_map.get_root().html.add_child(folium.Element(legend_html))
+    
     folium_map.save(output_path)
     print(f"Divvy map saved to: {output_path}")
 
