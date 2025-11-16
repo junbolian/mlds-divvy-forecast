@@ -78,11 +78,9 @@ Time-series status per station and snapshot:
 
 Capacity is defined as:
 
-- If `extra.slots` exists and is positive:
-  - `capacity = extra.slots`
-- Else, if `free_bikes + empty_slots` is positive:
+- If `free_bikes + empty_slots` is positive:
   - `capacity = free_bikes + empty_slots`
-- Otherwise:
+- Else:
   - `capacity = NULL`
 
 This uses the most reliable field when available and falls back to a reasonable approximation.
