@@ -155,8 +155,8 @@ Visualization details:
 - Each station is drawn as a `CircleMarker`.
 - Color encodes `status_label`:
   - `empty` → red
-  - `normal` → green
-  - `full` → dark blue
+  - `normal` → yellow
+  - `full` → green
   - `offline` → gray
   - `unknown` → light gray
 - Tooltip: station name.
