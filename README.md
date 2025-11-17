@@ -209,10 +209,11 @@ Each snapshot:
 - Cleans and transforms the data.
 - Inserts records into `dim_station` and `fact_station_status`.
 
-### 5.4 Run analytics summary
+### 5.4 Run analytics summary and EDA Plots
 
 ```bash
 docker compose exec app python -m src.analytics
+docker compose exec app python src/analysis/EDA
 ```
 
 This prints:
