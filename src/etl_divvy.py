@@ -166,9 +166,7 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
                 "empty_slots": empty_slots,
                 "capacity": capacity,  
                 "occupancy_ratio": (
-                    float(free_bikes) / capacity
-                    if available_total not in (None, 0)
-                    else None
+                    float(free_bikes) / capacity if capacity not in (None, 0) else None
                 ),
                 "status_label": status_label,
                 # Keep all extra info for future use
