@@ -214,7 +214,7 @@ Each snapshot:
 
 ```bash
 docker compose exec app python -m src.analytics
-docker compose exec app python src/analysis/EDA
+docker compose exec app python src/analysis/EDA.py
 ```
 
 This prints:
