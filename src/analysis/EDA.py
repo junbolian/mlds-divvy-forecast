@@ -22,17 +22,20 @@ stations.info()
 statuses.info()
 
 
-# If running in Docker (common for your pipeline)
-DOCKER_OUTPUT = "/app/outputs"
+# Detect if running inside Docker: check for known file
+RUNNING_IN_DOCKER = os.path.exists("/.dockerenv")
 
-if os.path.exists(DOCKER_OUTPUT):
-    OUTPUT_DIR = DOCKER_OUTPUT
+if RUNNING_IN_DOCKER:
+    OUTPUT_DIR = "/app/outputs"
 else:
-    # Local fallback for Jupyter / local runs
-    OUTPUT_DIR = os.path.abspath(os.path.join(os.getcwd(), "..", "outputs"))
+    # Local path: project_root/outputs
+    OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outputs")
 
+# Create folder if missing
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 print(f"Saving plots to: {OUTPUT_DIR}")
+
 
 
 df = statuses.merge(stations, on="station_id", how="left")
