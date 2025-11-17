@@ -186,6 +186,7 @@ The map can be regenerated at any time after new snapshots are ingested.
 From the repository root:
 
 ```bash
+docker compose build
 docker compose up -d
 ```
 
