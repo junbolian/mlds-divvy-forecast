@@ -4,9 +4,10 @@ This repository implements a live data pipeline for Chicago’s Divvy bike syste
 
 - Pulling live station data from the API.
 - Cleaning and transforming the data into a simple star schema.
-- Classifying station status (EMPTY / NORMAL / FULL / OFFLINE).
+- Classifying station status (EMPTY / NORMAL / FULL / OFFLINE / UNKNOWN).
 - Computing a basic “expected demand index” for each station.
 - Visualizing results on an interactive map.
+- Running an EDA pipeline to analyze bike availability and station behavior, and generate EDA plots/
 
 All data comes from the live API at runtime. No CSV files or static datasets are stored in the repo.
 
@@ -114,27 +115,6 @@ Reasoning:
   - Low occupancy → few bikes, risk of finding no bike.
   - High occupancy → few empty docks, risk of not being able to return.
 
-### 3.2 Expected demand index
-
-The project defines a basic “expected demand index” per station based on recent occupancy:
-
-1. Over a rolling window (default 60 minutes), compute:
-
-   - `avg_occ_last_hour = AVG(occupancy_ratio)`
-
-2. Define:
-
-   - `expected_demand_index = 1 - avg_occ_last_hour`
-   - The value is clipped to `[0, 1]`.
-
-Interpretation:
-
-- If a station is usually full (high `avg_occ_last_hour`), there is strong demand for empty docks.
-- If a station is usually empty (low `avg_occ_last_hour`), there is strong demand for bikes.
-- This index summarizes recent “pressure” on the station using only the data we collect.
-
-This logic is implemented in `src/analytics.py` and reused in `src/map_divvy.py`.
-
 ---
 
 ## 4. Interactive Map
@@ -214,13 +194,41 @@ Each snapshot:
 
 ```bash
 docker compose exec app python -m src.analytics
-docker compose exec app python src/analysis/EDA.py
 ```
 
 This prints:
 
 - Counts of stations in each status (EMPTY / NORMAL / FULL / OFFLINE / UNKNOWN).
-- For each station, the average occupancy in the last hour and the expected demand index.
+- For each station, the average occupancy in the last hour.
+
+```bash
+docker compose exec app python src/analysis/EDA.py
+```
+
+EDA Pipeline Outputs (Four Plots Saved to the `outputs/` Folder):
+
+The EDA script (`src/analysis/EDA.py`) generates four visualizations to help analyze city-wide Divvy usage patterns.  
+All plots are automatically saved to:
+
+- `outputs/` (local runs)  
+- `/app/outputs/` (inside Docker)  
+
+#### 1. **Average Occupancy Ratio by Chicago Region**
+**File:** `Average_Occupancy_Ratio_by_Region.png`  
+Shows differences in station fullness across the **North Side**, **South Side**, **West Side**, and **East Side**.
+
+#### 2. **Distribution of Free Bikes Across All Stations**
+**File:** `Distribution_of_Free_Bikes.png`  
+A histogram showing how many bikes are typically available at stations, highlighting **demand imbalance**.
+
+#### 3. **Top 10 Stations by Average Occupancy Ratio**
+**File:** `Top_10_Stations_by_Average_Occupancy_Ratio.png`  
+Identifies stations that are consistently **near capacity** and may require **rebalancing**.
+
+#### 4. **Most Volatile Stations (Highest Occupancy Variance)**
+**File:** `Most_Volatile_Stations.png`  
+Shows which stations fluctuate the most in availability—often indicating **commuter hubs**, **tourism areas**, or **high-traffic zones**.
+
 
 ### 5.5 Generate the map
 
