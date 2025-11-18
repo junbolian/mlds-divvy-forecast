@@ -41,7 +41,7 @@ These fields are enough to monitor availability and basic operational status for
 
 ---
 
-## 2. Data Model and Processing
+## 2. Tables and Data Manipulation
 
 The pipeline writes data into a PostgreSQL database using a simple star schema:
 
@@ -95,11 +95,7 @@ occupancy_ratio = free_bikes / capacity
 ```
 This gives a value between 0 and 1, representing the share of docks that currently hold bikes.
 
----
-
-## 3. Station Status and Expected Demand
-
-### 3.1 Station status classification
+### Station status classification
 
 Each station at each snapshot is classified into one of:
 
@@ -115,10 +111,9 @@ Reasoning:
 - The 20% and 80% thresholds are simple and interpretable:
   - Low occupancy → few bikes, risk of finding no bike.
   - High occupancy → few empty docks, risk of not being able to return.
-
 ---
 
-## 4. Interactive Map
+## 3. Interactive Map
 
 The script `src/map_divvy.py` builds an interactive HTML map and saves it as:
 
@@ -154,15 +149,15 @@ The map can be regenerated at any time after new snapshots are ingested.
 
 ---
 
-## 5. Running the Project with Docker
+## 4. Running the Project with Docker
 
-### 5.1 Requirements
+### 4.1 Requirements
 
 - Docker
 - Docker Compose
 - Internet connection
 
-### 5.2 Start the stack
+### 4.2 Start the stack
 
 From the repository root:
 
@@ -176,7 +171,7 @@ This launches:
 - `db` – PostgreSQL 16 with database `divvy`.
 - `app` – Python ETL + analytics environment
 
-### 5.3 Collect live snapshots
+### 4.3 Collect live snapshots
 
 **Full 1-hour dataset:**
 ```bash
@@ -207,7 +202,7 @@ This collects **3 snapshots**, 30 seconds apart.
    - `dim_station` (station metadata, upserted)  
    - `fact_station_status` (time-series snapshot data, append-only)
 
-### 5.4 Analytics summary
+### 4.4 Analytics summary
 
 ```bash
 docker compose exec app python -m src.analytics
@@ -217,7 +212,7 @@ Outputs include:
 - Counts of stations in each status (EMPTY / NORMAL / FULL / OFFLINE / UNKNOWN).
 - For each station, the average occupancy in the last hour.
 
-### 5.5 Generate the map
+### 4.5 Generate the map
 
 ```bash
 docker compose exec app python -m src.map_divvy
@@ -228,7 +223,7 @@ Output:
 
 Open the file in a browser to see the current station states and demand indices on a map.
 
-### 5.6 Exploratory Data Analysis (EDA)
+### 4.6 Exploratory Data Analysis (EDA)
 
 ```bash
 docker compose exec app python src/analysis/EDA.py
@@ -260,7 +255,7 @@ A time-series line plot showing how the system’s **overall occupancy changes**
 
 ---
 
-## 6. Key Insights from Analysis
+## 5. Key Insights from Analysis
 Based on 1-hour live collection:
 #### 1. North Side stations show the highest average occupancy
 They tend to have more full docks → high return demand.
@@ -282,7 +277,7 @@ No major spikes → consistent usage pattern in the time window.
 
 ---
 
-## 7. Airflow DAG
+## 6. Airflow DAG
 
 This project includes an Apache Airflow DAG (`airflow/dags/divvy_dag.py`) that automates the data pipeline.
 
@@ -321,7 +316,7 @@ Open the Airflow UI:
 
 ---
 
-## 8. Project Structure
+## 7. Project Structure
 
 Basic layout:
 
@@ -355,7 +350,7 @@ mlds-divvy-forecast/
 
 ---
 
-## 9. Design Summary
+## 8. Design Summary
 
 - API choice: Citybik.es v2 exposes live Divvy station data with availability and operational flags, which is ideal for building a streaming-style monitoring pipeline.
 - Schema: one dimension table for station metadata plus one fact table for time-series snapshots keeps the model easy to query and extend.
