@@ -260,7 +260,7 @@ A time-series line plot showing how the system’s **overall occupancy changes**
 
 ---
 
-## 7. Key Insights from Analysis
+## 6. Key Insights from Analysis
 Based on 1-hour live collection:
 #### 1. North Side stations show the highest average occupancy
 They tend to have more full docks → high return demand.
@@ -282,23 +282,42 @@ No major spikes → consistent usage pattern in the time window.
 
 ---
 
-## 8. Airflow DAG
+## 7. Airflow DAG
 
-This project includes an Airflow DAG:
+This project includes an Apache Airflow DAG (`airflow/dags/divvy_dag.py`) that automates the data pipeline.
+
+#### DAG Responsibilities
+- Run the ETL pipeline (src/etl_divvy.py)
+- Pull 1 hour of live Divvy data (12 snapshots × 5 minutes)
+- Insert records into PostgreSQL
+- Run every hour to continuously refresh the dataset
+- Log execution details (visible in Airflow UI)
+
+#### DAG Schedule
+The DAG is scheduled to run **hourly**:
+```python
+schedule_interval = "@hourly"
+```
+
+#### Running the DAG
+Start Airflow:
 ```bash
-airflow/divvy_dag.py
+docker compose up -d
 ```
 
-It orchestrates:
-- **ETL snapshot** 
-- **Status summaryt** 
-- **Demand prediction**
-- **Map generation**
-
-DAG structure:
-```text
-ETL → Summary → Prediction → Map
+Unpause:
+```bash
+docker compose exec airflow-webserver airflow dags unpause divvy_dag
 ```
+
+Trigger:
+```bash
+docker compose exec airflow-webserver airflow dags trigger divvy_dag
+```
+
+Open the Airflow UI:
+> → http://localhost:8080  
+> → login: admin / admin
 
 ---
 
