@@ -76,23 +76,23 @@ Time-series status per station and snapshot:
 - Timestamps are cleaned and parsed, then stored in UTC as `timestamp_utc`.
 - For display on the map, timestamps are converted to America/Chicago.
 
-#### Capacity
+#### Capacity:
 
 Capacity is defined as:
-
-- If `free_bikes + empty_slots` is positive:
-  - `capacity = free_bikes + empty_slots`
-- Else:
-  - `capacity = NULL`
-
+```yaml
+if free_bikes + empty_slots > 0:
+    capacity = free_bikes + empty_slots
+else:
+    capacity = NULL
+```
 This uses the most reliable field when available and falls back to a reasonable approximation.
 
 #### Occupancy ratio
 
 If capacity is positive:
-
-- `occupancy_ratio = free_bikes / capacity`
-
+```yaml
+occupancy_ratio = free_bikes / capacity
+```
 This gives a value between 0 and 1, representing the share of docks that currently hold bikes.
 
 ---
@@ -171,35 +171,28 @@ docker compose build
 docker compose up -d
 ```
 
-This starts:
+This launches:
 
 - `db` – PostgreSQL 16 with database `divvy`.
-- `app` – Python 3.11 container with the project code and dependencies.
+- `app` – Python ETL + analytics environment
 
-### 5.3 Collect live snapshots
+### 5.3 Collect live snapshots**
 
-To collect live Divvy bike data, run the ETL script inside the `app` container:
+**Full 1-hour dataset:**
 ```bash
 docker compose exec app python -m src.etl_divvy --snapshots 12 --sleep 300
 ```
-
-This command collects **12 snapshots**, each **5 minutes apart**, giving you a full **1-hour dataset**:
 - 12 snapshots total
 - 300 seconds (5 minutes) between snapshots
-- Snapshot #1 runs immediately, and snapshots #2–#12 run at 5-minute intervals
+- 1-hour coverage
 
-If you want a shorter test run (for debugging), you can use:
+**Quick test (3 snapshots, 30 seconds apart):**
 ```bash
 docker compose exec app python -m src.etl_divvy --snapshots 3 --sleep 30
 ```
 This collects **3 snapshots**, 30 seconds apart.
 
 #### What Each Snapshot Does
-- Calls the Divvy API.
-- Cleans and transforms the data.
-- Inserts records into `dim_station` and `fact_station_status`.
-
-Each snapshot performs a full ETL cycle:
 1. **Extract**  
    Fetches live data from the CityBikes Divvy API.
    
@@ -207,34 +200,43 @@ Each snapshot performs a full ETL cycle:
    - Parses timestamps  
    - Computes occupancy ratio  
    - Classifies station status (empty / normal / full / offline / unknown)
+   - Derive capacity
 
 4. **Load**  
    Inserts structured records into:  
    - `dim_station` (station metadata, upserted)  
    - `fact_station_status` (time-series snapshot data, append-only)
 
-### 5.4 Run analytics summary and EDA Plots
+### 5.4 Analytics summary
 
 ```bash
 docker compose exec app python -m src.analytics
 ```
 
-This prints:
-
+Outputs include:
 - Counts of stations in each status (EMPTY / NORMAL / FULL / OFFLINE / UNKNOWN).
 - For each station, the average occupancy in the last hour.
+
+### 5.5 Generate the map
+
+```bash
+docker compose exec app python -m src.map_divvy
+```
+
+Output:
+- `outputs/divvy_map.html`
+
+Open the file in a browser to see the current station states and demand indices on a map.
+
+### 5.6 Exploratory Data Analysis (EDA)
 
 ```bash
 docker compose exec app python src/analysis/EDA.py
 ```
 
-EDA Pipeline Outputs (Four Plots Saved to the `outputs/` Folder):
-
-The EDA script (`src/analysis/EDA.py`) generates four visualizations to help analyze city-wide Divvy usage patterns.  
-All plots are automatically saved to:
-
+Outputs saved to:
 - `outputs/` (local runs)  
-- `/app/outputs/` (inside Docker)  
+- `/app/outputs/` (inside Docker)
 
 #### 1. **Average Occupancy Ratio by Chicago Region**
 **File:** `Average_Occupancy_Ratio_by_Region.png`  
@@ -252,41 +254,88 @@ Identifies stations that are consistently **near capacity** and may require **re
 **File:** `Most_Volatile_Stations.png`  
 Shows which stations fluctuate the most in availability—often indicating **commuter hubs**, **tourism areas**, or **high-traffic zones**.
 
-
-### 5.5 Generate the map
-
-```bash
-docker compose exec app python -m src.map_divvy
-```
-
-Open:
-
-- `outputs/divvy_map.html`
-
-in a browser to see the current station states and demand indices on a map.
+#### 5. **Most Volatile Stations (Highest Occupancy Variance)**
+**File:** `Average_Occupancy_Over_Time.png`   
+A time-series line plot showing how the system’s **overall occupancy changes** across the collected snapshots.
 
 ---
 
-## 6. Project Structure
+## 7. Key Insights from Analysis
+Based on 1-hour live collection:
+#### 1. North Side stations show the highest average occupancy
+They tend to have more full docks → high return demand.
+
+#### 2. Distribution of free bikes is highly imbalanced
+Some stations often approach zero bikes (empty risk), while others rarely drop below half-full.
+
+#### 3. Top 10 busiest stations cluster near Downtown
+Likely commuter hubs, receiving traffic during typical work hours.
+
+#### 4. Volatile stations correspond to transit corridors
+High variance suggests:
+- industrial commuting
+- CTA/Metra connectors
+- tourism areas
+  
+#### 5. System-wide occupancy fluctuates smoothly over the hour
+No major spikes → consistent usage pattern in the time window.
+
+---
+
+## 8. Airflow DAG
+
+This project includes an Airflow DAG:
+```bash
+airflow/divvy_dag.py
+```
+
+It orchestrates:
+- **ETL snapshot** 
+- **Status summaryt** 
+- **Demand prediction**
+- **Map generation**
+
+DAG structure:
+```text
+ETL → Summary → Prediction → Map
+```
+
+---
+
+## 9. Project Structure
 
 Basic layout:
 
-- `Dockerfile` – builds the Python application image.
-- `docker-compose.yml` – defines `db` (PostgreSQL) and `app` services.
-- `requirements.txt` – Python dependencies.
-- `README.md` – project description and instructions.
-- `outputs/` – generated artifacts (e.g. `divvy_map.html`, not committed to git).
-- `src/`
-  - `config.py` – configuration (DB connection, API URL, thresholds).
-  - `db.py` – SQLAlchemy engine and database connection.
-  - `models.py` – table definitions for `dim_station` and `fact_station_status`.
-  - `etl_divvy.py` – ETL pipeline from API to PostgreSQL.
-  - `analytics.py` – status summary and expected demand index computation.
-  - `map_divvy.py` – interactive map generation.
+```arduino
+mlds-divvy-forecast/
+│
+├── src/
+│   ├── analysis/
+│   │   └── EDA.py
+│   ├── analytics.py       : status summary and expected demand index computation.
+│   ├── etl_divvy.py       : ETL pipeline from API to PostgreSQL.
+│   ├── map_divvy.py       : interactive map generation.
+│   ├── models.py          : table definitions for `dim_station` and `fact_station_status`.
+│   ├── config.py          : configuration (DB connection, API URL, thresholds).
+│   ├── db.py              : SQLAlchemy engine and database connection.
+│   └── __init__.py
+│
+├── airflow/
+│   └── divvy_dag.py
+│
+├── outputs/
+│   ├── *.png              : generated artifacts (not committed to git).
+│   └── divvy_map.html
+│
+├── Dockerfile             : builds the Python application image.
+├── requirements.txt       : Python dependencies.
+├── docker-compose.yml     : defines `db` (PostgreSQL) and `app` services.
+└── README.md              : project description and instructions.
+```
 
 ---
 
-## 7. Design Summary
+## 10. Design Summary
 
 - API choice: Citybik.es v2 exposes live Divvy station data with availability and operational flags, which is ideal for building a streaming-style monitoring pipeline.
 - Schema: one dimension table for station metadata plus one fact table for time-series snapshots keeps the model easy to query and extend.
