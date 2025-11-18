@@ -16,7 +16,16 @@ from .db import engine
 
 metadata = MetaData()
 
-# Dimension table: static station information
+# ----------------------------------------------------------------------
+# Dimension Table: dim_station
+# ----------------------------------------------------------------------
+# Contains station-level attributes that change infrequently.
+# This stores one row per station, and is updated via UPSERTs.
+#   - station_id: unique identifier from the Citybikes API
+#   - is_active: marks whether the station should be considered live
+#
+# This table is joined with fact_station_status to provide context
+# for time-series measurements.
 dim_station = Table(
     "dim_station",
     metadata,
@@ -28,7 +37,20 @@ dim_station = Table(
     Column("is_active", Boolean, nullable=False, server_default="true"),
 )
 
-# Fact table: time series of station status snapshots
+# ----------------------------------------------------------------------
+# Fact Table: fact_station_status
+# ----------------------------------------------------------------------
+# Append-only time-series table storing each snapshot pulled from
+# the Citybikes live API.
+#
+# Key columns:
+#   - id: surrogate primary key for efficient indexing
+#   - station_id: FK to dim_station
+#   - timestamp_utc: exact snapshot timestamp (stored in UTC)
+#   - free_bikes / empty_slots / capacity: raw station metrics
+#   - occupancy_ratio: percentage free bikes (0–1), precision = 5,2
+#   - status_label: derived classification (empty/normal/full/offline)
+#   - raw_extra: all “extra” fields from API preserved for debugging/future use
 fact_station_status = Table(
     "fact_station_status",
     metadata,
@@ -43,7 +65,9 @@ fact_station_status = Table(
     Column("raw_extra", JSON, nullable=True),
 )
 
-
+# ----------------------------------------------------------------------
+# Utility: Create all tables
+# ----------------------------------------------------------------------
 def create_tables() -> None:
     """
     Create all tables in the database if they do not exist.

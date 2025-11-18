@@ -12,10 +12,19 @@ from .db import engine
 # We keep timestamps in UTC in the database but convert to this tz for users.
 LOCAL_TZ_NAME = "America/Chicago"
 
-
+# ----------------------------------------------------------------------
+# Utility: status → color mapping
+# ----------------------------------------------------------------------
 def status_to_color(status: str) -> str:
     """
-    Map our status_label to a marker color.
+    Translate a station's status_label into a folium marker color.
+
+    Colors intentionally match intuitive expectations:
+        empty   -> red
+        full    -> green
+        normal  -> yellow
+        offline -> gray
+        unknown -> lightgray
     """
     mapping: Dict[str, str] = {
         "empty": "red",
@@ -26,11 +35,18 @@ def status_to_color(status: str) -> str:
     }
     return mapping.get(status, "lightgray")
 
-
+# ----------------------------------------------------------------------
+# Query: latest status for each station
+# ----------------------------------------------------------------------
 def build_latest_status_dataframe() -> pd.DataFrame:
     """
-    Query PostgreSQL for the latest status row per station.
-    Returns a DataFrame with one row per station.
+    Query PostgreSQL for the *most recent* status entry per station.
+
+    This uses a LATERAL join so each dim_station retrieves its latest
+    fact_station_status row. The result is one row per active station.
+
+    Returns:
+        Pandas DataFrame with station metadata + latest fact fields.
     """
     query = text(
         """
@@ -65,7 +81,9 @@ def build_latest_status_dataframe() -> pd.DataFrame:
 
     return df
 
-
+# ----------------------------------------------------------------------
+# Compute last-hour demand prediction
+# ----------------------------------------------------------------------
 def build_last_hour_demand(window_minutes: int = 60) -> pd.DataFrame:
     """
     Compute last-hour average occupancy per station and
@@ -97,19 +115,32 @@ def build_last_hour_demand(window_minutes: int = 60) -> pd.DataFrame:
 
     return df
 
-
+# ----------------------------------------------------------------------
+# Map generation
+# ----------------------------------------------------------------------
 def create_divvy_map(
     output_path: str = "outputs/divvy_map.html",
     default_zoom: int = 12,
 ) -> None:
     """
-    Build an interactive HTML map of the latest Divvy station status.
+    Create an interactive HTML map showing Divvy station status and
+    short-term demand indicators.
+
+    Steps:
+        1. Fetch current status (1 row/station)
+        2. Fetch last-hour demand metrics
+        3. Merge the two datasets
+        4. Plot stations as colored markers
+        5. Add popups with detailed metrics
+        6. Save the result as an HTML map
     """
+    # Load latest status
     df_latest = build_latest_status_dataframe()
     if df_latest.empty:
         print("No data found in the database. Run the ETL first.")
         return
 
+    # Load 1-hour demand statistics
     df_demand = build_last_hour_demand(window_minutes=60)
 
     # Merge demand info (if available)
@@ -134,6 +165,9 @@ def create_divvy_map(
         control_scale=True,
     )
 
+    # ------------------------------------------------------------------
+    # Add station markers
+    # ------------------------------------------------------------------
     for _, row in df.iterrows():
         status = row["status_label"] or "unknown"
         color = status_to_color(status)
@@ -190,8 +224,10 @@ def create_divvy_map(
         ).add_to(folium_map)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-    # Add legend box
+
+    # ------------------------------------------------------------------
+    # Add a custom legend to the bottom-left corner
+    # ------------------------------------------------------------------
     legend_html = """
     <div style="
         position: fixed; 
@@ -212,11 +248,14 @@ def create_divvy_map(
     """
 
     folium_map.get_root().html.add_child(folium.Element(legend_html))
-    
+
+    # Save resulting map as HTML
     folium_map.save(output_path)
     print(f"Divvy map saved to: {output_path}")
 
-
+# ----------------------------------------------------------------------
+# Script entry point
+# ----------------------------------------------------------------------
 def main() -> None:
     create_divvy_map()
 
