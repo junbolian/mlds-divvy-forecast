@@ -89,8 +89,8 @@ plt.title("Top 10 Stations by Average Occupancy Ratio")
 plt.xlabel("Average Occupancy Ratio")
 plt.ylabel("Station Name")
 
-plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "top_10_Stations_by_Average_Occupancy_Ratio.png"), dpi=300)
+plt.tight_layout(pad=2.0)
+plt.savefig(os.path.join(OUTPUT_DIR, "top_10_Stations_by_Average_Occupancy_Ratio.png"), dpi=300, bbox_inches='tight')
 plt.close()
 
 # ----------------------------------------------------------------------
@@ -165,7 +165,7 @@ plt.title("Average Occupancy Ratio by Chicago Region")
 plt.ylabel("Mean Occupancy Ratio")
 plt.xlabel("Region")
 
-plt.tight_layout()
+plt.tight_layout(pad=2.0)
 plt.savefig(os.path.join(OUTPUT_DIR, "Average_Occupancy_Ratio_by_Chicago_Region.png"), dpi=300)
 plt.close()
 
@@ -175,8 +175,9 @@ plt.close()
 sns.histplot(df["free_bikes"].dropna(), bins=30)
 plt.title("Distribution of Free Bikes Across All Stations")
 
-plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "Distribution_of_Free_Bikes_Across_All_Stations.png"), dpi=300)
+plt.subplots_adjust(top=0.90)
+plt.tight_layout(pad=2.0)
+plt.savefig(os.path.join(OUTPUT_DIR, "Distribution_of_Free_Bikes_Across_All_Stations.png"), dpi=300, bbox_inches='tight')
 plt.close()
 
 # ----------------------------------------------------------------------
@@ -193,6 +194,7 @@ variability.head(10).plot(
     title="Most Volatile Stations (Occupancy Std Dev)"
 )
 
-plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "Most_Volatile_Stations.png"), dpi=300)
+
+plt.tight_layout(pad=2.0)
+plt.savefig(os.path.join(OUTPUT_DIR, "Most_Volatile_Stations.png"), dpi=300, bbox_inches='tight')
 plt.close()
