@@ -176,7 +176,7 @@ This launches:
 - `db` – PostgreSQL 16 with database `divvy`.
 - `app` – Python ETL + analytics environment
 
-### 5.3 Collect live snapshots**
+### 5.3 Collect live snapshots
 
 **Full 1-hour dataset:**
 ```bash
@@ -321,40 +321,41 @@ Open the Airflow UI:
 
 ---
 
-## 9. Project Structure
+## 8. Project Structure
 
 Basic layout:
 
 ```arduino
 mlds-divvy-forecast/
 │
-├── src/
-│   ├── analysis/
+├── src/                   # Application source code
+│   ├── analysis/          # Exploratory Data Analysis scripts
 │   │   └── EDA.py
-│   ├── analytics.py       : status summary and expected demand index computation.
-│   ├── etl_divvy.py       : ETL pipeline from API to PostgreSQL.
-│   ├── map_divvy.py       : interactive map generation.
-│   ├── models.py          : table definitions for `dim_station` and `fact_station_status`.
-│   ├── config.py          : configuration (DB connection, API URL, thresholds).
-│   ├── db.py              : SQLAlchemy engine and database connection.
+│   ├── analytics.py       # status summary and expected demand index computation.
+│   ├── etl_divvy.py       # ETL pipeline from API to PostgreSQL.
+│   ├── map_divvy.py       # interactive map generation.
+│   ├── models.py          # table definitions for "dim_station" and "fact_station_status".
+│   ├── config.py          # configuration (DB connection, API URL, thresholds).
+│   ├── db.py              # SQLAlchemy engine and database connection.
 │   └── __init__.py
 │
-├── airflow/
-│   └── divvy_dag.py
+├── airflow/               # Airflow pipeline orchestration
+│   └── dags/
+│       └── divvy_dag.py
 │
-├── outputs/
-│   ├── *.png              : generated artifacts (not committed to git).
-│   └── divvy_map.html
+├── outputs/               # Generated results (ignored by git)
+│   ├── *.png              # EDA plots
+│   └── divvy_map.html     # Interaction station map
 │
-├── Dockerfile             : builds the Python application image.
-├── requirements.txt       : Python dependencies.
-├── docker-compose.yml     : defines `db` (PostgreSQL) and `app` services.
-└── README.md              : project description and instructions.
+├── Dockerfile             # App container definition
+├── requirements.txt       # Python dependency list.
+├── docker-compose.yml     # Services: app + db + airflow
+└── README.md              # Project description and instructions.
 ```
 
 ---
 
-## 10. Design Summary
+## 9. Design Summary
 
 - API choice: Citybik.es v2 exposes live Divvy station data with availability and operational flags, which is ideal for building a streaming-style monitoring pipeline.
 - Schema: one dimension table for station metadata plus one fact table for time-series snapshots keeps the model easy to query and extend.
