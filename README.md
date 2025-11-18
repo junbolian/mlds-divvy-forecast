@@ -1,6 +1,7 @@
 # Chicago Divvy Live Data Engineering Pipeline
 
-This repository implements a live data pipeline for Chicago’s Divvy bike system using the public Citybik.es v2 API and PostgreSQL. The project covers:
+This repository implements a live data pipeline for the **Chicago Divvy bike-sharing system**, using the public **CityBikes v2 API** and a Postgres warehouse.
+It demonstrates an end-to-end modern data engineering workflow:
 
 - Pulling live station data from the API.
 - Cleaning and transforming the data into a simple star schema.
@@ -24,7 +25,7 @@ From the JSON response, the project uses:
 From `network`:
 - `network.location.city` – city name (Chicago) for station metadata.
 
-From each `station`:
+From each `station`, the pipeline uses:
 - `id` – station identifier.
 - `name` – station name.
 - `latitude`, `longitude` – geographic location.
