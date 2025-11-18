@@ -6,3 +6,4 @@ pandas
 folium
 matplotlib
 seaborn
+numpy
