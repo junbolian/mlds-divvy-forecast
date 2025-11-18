@@ -95,7 +95,7 @@ occupancy_ratio = free_bikes / capacity
 ```
 This gives a value between 0 and 1, representing the share of docks that currently hold bikes.
 
-### Station status classification
+#### Station status classification
 
 Each station at each snapshot is classified into one of:
 
