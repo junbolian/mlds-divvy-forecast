@@ -177,18 +177,40 @@ This starts:
 
 ### 5.3 Collect live snapshots
 
-Run the ETL inside the `app` container. Example:
-
+To collect live Divvy bike data, run the ETL script inside the `app` container:
 ```bash
-# 3 snapshots, 30 seconds apart
-docker compose exec app python -m src.etl_divvy --snapshots 3 --sleep 30
+docker compose exec app python -m src.etl_divvy --snapshots 12 --sleep 300
 ```
 
-Each snapshot:
+This command collects **12 snapshots**, each **5 minutes apart**, giving you a full **1-hour dataset**:
+- 12 snapshots total
+- 300 seconds (5 minutes) between snapshots
+- Snapshot #1 runs immediately, and snapshots #2–#12 run at 5-minute intervals
 
+If you want a shorter test run (for debugging), you can use:
+```bash
+docker compose exec app python -m src.etl_divvy --snapshots 3 --sleep 30
+```
+This collects **3 snapshots**, 30 seconds apart.
+
+#### What Each Snapshot Does
 - Calls the Divvy API.
 - Cleans and transforms the data.
 - Inserts records into `dim_station` and `fact_station_status`.
+
+Each snapshot performs a full ETL cycle:
+1. **Extract**  
+   Fetches live data from the CityBikes Divvy API.
+   
+3. **Transform**  
+   - Parses timestamps  
+   - Computes occupancy ratio  
+   - Classifies station status (empty / normal / full / offline / unknown)
+
+4. **Load**  
+   Inserts structured records into:  
+   - `dim_station` (station metadata, upserted)  
+   - `fact_station_status` (time-series snapshot data, append-only)
 
 ### 5.4 Run analytics summary and EDA Plots
 
