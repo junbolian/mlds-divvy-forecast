@@ -111,6 +111,34 @@ Reasoning:
 - The 20% and 80% thresholds are simple and interpretable:
   - Low occupancy → few bikes, risk of finding no bike.
   - High occupancy → few empty docks, risk of not being able to return.
+
+#### Schema Diagram
+
+```scss
+               dim_station
+         --------------------------
+          station_id (PK)
+          name
+          latitude
+          longitude
+          city
+          is_active
+               ▲ 
+               │ (FK)
+               │
+       fact_station_status
+   ----------------------------------
+    id (PK)
+    station_id (FK)
+    timestamp_utc
+    free_bikes
+    empty_slots
+    capacity
+    occupancy_ratio
+    status_label
+    raw_extra (JSON)
+```
+
 ---
 
 ## 3. Interactive Map
@@ -202,7 +230,7 @@ This collects **3 snapshots**, 30 seconds apart.
    - `dim_station` (station metadata, upserted)  
    - `fact_station_status` (time-series snapshot data, append-only)
 
-### 4.4 Analytics summary
+### 4.4 Analytics Summary
 
 ```bash
 docker compose exec app python -m src.analytics
@@ -212,7 +240,7 @@ Outputs include:
 - Counts of stations in each status (EMPTY / NORMAL / FULL / OFFLINE / UNKNOWN).
 - For each station, the average occupancy in the last hour.
 
-### 4.5 Generate the map
+### 4.5 Generate the Interactive Map
 
 ```bash
 docker compose exec app python -m src.map_divvy
@@ -249,9 +277,9 @@ Identifies stations that are consistently **near capacity** and may require **re
 **File:** `Most_Volatile_Stations.png`  
 Shows which stations fluctuate the most in availability—often indicating **commuter hubs**, **tourism areas**, or **high-traffic zones**.
 
-#### 5. **Average Occupancy Over Time**
-**File:** `Average_Occupancy_Over_Time.png`   
-A time-series line plot showing how the system’s **overall occupancy changes** across the collected snapshots.
+#### 5. **Overall Station Status Distribution**
+**File:** `Station_Status_Distribution.png`   
+A pie chart summarizing the proportion of stations classified as empty, normal, full, offline, or unknown in the dataset.
 
 ---
 
@@ -272,8 +300,8 @@ High variance suggests:
 - CTA/Metra connectors
 - tourism areas
   
-#### 5. System-wide occupancy fluctuates smoothly over the hour
-No major spikes → consistent usage pattern in the time window.
+#### 5. Occupancy trends are smooth
+No sudden spikes during the hour window.
 
 ---
 
