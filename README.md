@@ -249,7 +249,7 @@ Identifies stations that are consistently **near capacity** and may require **re
 **File:** `Most_Volatile_Stations.png`  
 Shows which stations fluctuate the most in availability—often indicating **commuter hubs**, **tourism areas**, or **high-traffic zones**.
 
-#### 5. **Most Volatile Stations (Highest Occupancy Variance)**
+#### 5. **Average Occupancy Over Time**
 **File:** `Average_Occupancy_Over_Time.png`   
 A time-series line plot showing how the system’s **overall occupancy changes** across the collected snapshots.
 
