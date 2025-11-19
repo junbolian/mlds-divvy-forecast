@@ -76,7 +76,7 @@ Time-series status per station and snapshot:
 - Timestamps are cleaned and parsed, then stored in UTC as `timestamp_utc`.
 - For display on the map, timestamps are converted to America/Chicago.
 
-#### Capacity:
+#### Capacity
 
 Capacity is defined as:
 ```yaml
