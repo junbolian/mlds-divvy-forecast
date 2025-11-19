@@ -21,15 +21,15 @@ def status_to_color(status: str) -> str:
 
     Colors intentionally match intuitive expectations:
         empty   -> red
-        full    -> green
-        normal  -> yellow
+        full    -> blue
+        normal  -> green
         offline -> gray
         unknown -> lightgray
     """
     mapping: Dict[str, str] = {
         "empty": "red",
-        "full": "green",
-        "normal": "yellow",
+        "full": "blue",
+        "normal": "green",
         "offline": "gray",
         "unknown": "lightgray",
     }
@@ -238,10 +238,10 @@ def create_divvy_map(
         padding: 10px;
         font-size: 14px;
     ">
-    <b>Station Status Legend</b><br>
+    <b>Station Status</b><br>
     <span style="color:red;">&#9679;</span> Empty<br>
-    <span style="color:green;">&#9679;</span> Full<br>
-    <span style="color:yellow;">&#9679;</span> Normal<br>
+    <span style="color:blue;">&#9679;</span> Full<br>
+    <span style="color:green;">&#9679;</span> Normal<br>
     <span style="color:gray;">&#9679;</span> Offline<br>
     <span style="color:lightgray;">&#9679;</span> Unknown
     </div>
