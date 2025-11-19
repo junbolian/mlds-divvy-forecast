@@ -375,7 +375,7 @@ mlds-divvy-forecast/
 ├── src/                   # Application source code
 │   ├── analysis/          # Exploratory Data Analysis scripts
 │   │   ├── EDA.py
-│   │     └── __init__.py
+│   │   └── __init__.py
 │   ├── analytics.py       # status summary and expected demand index computation.
 │   ├── etl_divvy.py       # ETL pipeline from API to PostgreSQL.
 │   ├── map_divvy.py       # interactive map generation.
