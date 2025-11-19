@@ -15,6 +15,10 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U divvy -d divvy" ]
+      interval: 5s
+      retries: 5
 
   # ----------------------------
   # Python Application Container
@@ -44,6 +48,7 @@ services:
     container_name: airflow_init
     depends_on:
       - db
+    restart: "no"
     environment:
       AIRFLOW_UID: 50000
       AIRFLOW_GID: 0

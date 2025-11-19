@@ -119,7 +119,7 @@ def build_last_hour_demand(window_minutes: int = 60) -> pd.DataFrame:
 # Map generation
 # ----------------------------------------------------------------------
 def create_divvy_map(
-    output_path: str = "outputs/divvy_map.html",
+    output_path: str = "data/outputs/divvy_map.html",
     default_zoom: int = 12,
 ) -> None:
     """

@@ -1,20 +1,19 @@
 FROM python:3.11-slim
 
-# Install system dependencies required by psycopg2 and other libs
+# Install system dependencies needed for psycopg2, numpy, pandas, etc.
 RUN apt-get update && \
-    apt-get install -y gcc libpq-dev && \
+    apt-get install -y gcc libpq-dev build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# Set working directory inside the container
+# Set working directory
 WORKDIR /app
 
-# Install Python dependencies
-COPY requirements.txt .
+# Install Python dependencies using Docker cache layers
+COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the project
+# Copy full project into container
 COPY . .
 
-# By default, keep the container alive.
-# We will run ETL / analytics / map commands via `docker compose exec app ...`
-CMD ["sleep", "infinity"]
+# Keep container alive for interactive ETL/analytics commands
+CMD ["tail", "-f", "/dev/null"]

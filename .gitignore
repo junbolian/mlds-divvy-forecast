@@ -13,6 +13,7 @@ venv/
 
 # Outputs (generated artifacts)
 outputs/
+data/
 
 # Docker junk
 *.log

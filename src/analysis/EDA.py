@@ -1,16 +1,16 @@
 import sys, os
+import textwrap
 
 # ----------------------------------------------------------------------
 # Setup: Add project root to Python path so we can import config.py
 # ----------------------------------------------------------------------
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
-from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+from src.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 
 # Visualization + Analysis Libraries
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-import numpy as np
 
 # Database Connector
 from sqlalchemy import create_engine
@@ -37,10 +37,12 @@ statuses.info()
 RUNNING_IN_DOCKER = os.path.exists("/.dockerenv")
 
 if RUNNING_IN_DOCKER:
-    OUTPUT_DIR = "/app/outputs"
+    OUTPUT_DIR = "/app/data/outputs"
 else:
-    # Local path: project_root/outputs
-    OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outputs")
+    OUTPUT_DIR = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "outputs"
+    )
 
 # Ensure the output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -72,25 +74,30 @@ station_rank["rank"] = station_rank["avg_occupancy"].rank(
     ascending=False, method="dense"
 ).astype(int)
 
-station_rank.head(10)
-
 # Plot Top 10 stations
-sns.barplot(
-    data=station_rank.head(10),
-    x="avg_occupancy",
-    y="name",
-    hue="name",            # ← add this
-    dodge=False,
-    legend=False,          # ← avoid redundant legend
-    palette="Blues_r"
-)
+top10 = station_rank.head(10)
 
-plt.title("Top 10 Stations by Average Occupancy Ratio")
-plt.xlabel("Average Occupancy Ratio")
-plt.ylabel("Station Name")
+# Wrap long names for readability
+labels = [textwrap.fill(name, width=30) for name in top10["name"]]
 
-plt.tight_layout(pad=2.0)
-plt.savefig(os.path.join(OUTPUT_DIR, "top_10_Stations_by_Average_Occupancy_Ratio.png"), dpi=300, bbox_inches='tight')
+plt.figure(figsize=(13, 7))
+
+# Using a clearer gradient (Blues reversed)
+colors = sns.color_palette("Blues_r", n_colors=len(top10))
+
+plt.barh(labels, top10["avg_occupancy"], color=colors)
+plt.gca().invert_yaxis()  # Show highest occupancy at the top
+
+# Add numeric labels next to each bar
+for i, value in enumerate(top10["avg_occupancy"]):
+    plt.text(value + 0.01, i, f"{value:.2f}", va="center", fontsize=10)
+
+plt.title("Top 10 Stations by Average Occupancy Ratio\n(Based on Live Snapshot Collection)", fontsize=16)
+plt.xlabel("Average Occupancy Ratio", fontsize=12)
+plt.ylabel("")  # remove y-axis label for cleaner look
+
+plt.tight_layout()
+plt.savefig(os.path.join(OUTPUT_DIR, "top_10_Stations_by_Average_Occupancy_Ratio.png"), dpi=300)
 plt.close()
 
 # ----------------------------------------------------------------------
@@ -121,27 +128,7 @@ stations["region"] = stations.apply(
 df = statuses.merge(stations, on="station_id", how="left")
 
 # ----------------------------------------------------------------------
-# EDA 3: Time-Series Analysis — Average Occupancy Over the Hour
-# ----------------------------------------------------------------------
-time_series = (
-    df.groupby("timestamp_utc")["occupancy_ratio"]
-      .mean()
-      .reset_index()
-)
-
-plt.figure(figsize=(10, 5))
-plt.plot(time_series["timestamp_utc"], time_series["occupancy_ratio"], marker="o")
-plt.title("Average Occupancy Ratio Over Time")
-plt.xlabel("Time")
-plt.ylabel("Average Occupancy Ratio")
-plt.xticks(rotation=45)
-
-plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "Average_Occupancy_Over_Time.png"), dpi=300)
-plt.close()
-
-# ----------------------------------------------------------------------
-# EDA 4: Average Occupancy by Chicago Region
+# EDA 3: Average Occupancy by Chicago Region
 # ----------------------------------------------------------------------
 region_stats = (
     df.groupby("region")["occupancy_ratio"]
@@ -170,31 +157,84 @@ plt.savefig(os.path.join(OUTPUT_DIR, "Average_Occupancy_Ratio_by_Chicago_Region.
 plt.close()
 
 # ----------------------------------------------------------------------
-# EDA 5: Distribution of Free Bikes
+# EDA 4: Distribution of Free Bikes
 # ----------------------------------------------------------------------
-sns.histplot(df["free_bikes"].dropna(), bins=30)
-plt.title("Distribution of Free Bikes Across All Stations")
+plt.figure(figsize=(13, 7))
 
-plt.subplots_adjust(top=0.90)
-plt.tight_layout(pad=2.0)
-plt.savefig(os.path.join(OUTPUT_DIR, "Distribution_of_Free_Bikes_Across_All_Stations.png"), dpi=300, bbox_inches='tight')
+sns.histplot(df["free_bikes"].dropna(), bins=30, kde=False)
+
+plt.title("Distribution of Free Bikes Across All Stations", fontsize=16)
+plt.xlabel("Number of Free Bikes", fontsize=12)
+plt.ylabel("Count of Stations", fontsize=12)
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(OUTPUT_DIR, "Distribution_of_Free_Bikes_Across_All_Stations.png"),
+    dpi=300, bbox_inches='tight'
+)
+
 plt.close()
 
 # ----------------------------------------------------------------------
-# EDA 6: Identify Most Volatile (Unstable) Stations
+# EDA 5: Identify Most Volatile (Unstable) Stations
 # ----------------------------------------------------------------------
+# Compute standard deviation of occupancy ratio per station
 variability = (
     df.groupby("name")["occupancy_ratio"]
       .std()
       .sort_values(ascending=False)
+      .head(10)
 )
 
-variability.head(10).plot(
-    kind="barh",
-    title="Most Volatile Stations (Occupancy Std Dev)"
+# Convert index to list and wrap long station names
+labels = [textwrap.fill(station, width=35) for station in variability.index]
+
+plt.figure(figsize=(12, 7))
+
+# Use a gradient color based on magnitude of volatility
+colors = sns.color_palette("Reds", n_colors=len(variability))
+
+plt.barh(labels, variability.values, color=colors)
+
+plt.gca().invert_yaxis()  # Highest volatility at the top
+
+plt.title("Top 10 Most Volatile Divvy Stations\n(Highest Occupancy Variability)", fontsize=16)
+plt.xlabel("Occupancy Standard Deviation", fontsize=12)
+plt.ylabel("")  # remove noisy “name” label
+
+# Add numerical value to each bar
+for i, value in enumerate(variability.values):
+    plt.text(value + 0.01, i, f"{value:.3f}", va="center", fontsize=10)
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(OUTPUT_DIR, "Most_Volatile_Stations.png"),
+    dpi=300,
+    bbox_inches='tight'
+)
+plt.close()
+
+
+# ----------------------------------------------------------------------
+# EDA 6: Identify Overall Station Status Distribution
+# ----------------------------------------------------------------------
+status_counts = df["status_label"].value_counts()
+explode = [0.05] + [0]* (len(status_counts)-1)
+
+plt.figure(figsize=(6, 6))
+plt.pie(
+    status_counts,
+    labels=status_counts.index,
+    autopct="%1.1f%%",
+    startangle=140,
+    colors=sns.color_palette("Set2"),
+    explode=explode
 )
 
+plt.title("Overall Station Status Distribution")
+plt.tight_layout()
 
-plt.tight_layout(pad=2.0)
-plt.savefig(os.path.join(OUTPUT_DIR, "Most_Volatile_Stations.png"), dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(OUTPUT_DIR, "Station_Status_Distribution.png"), dpi=300)
 plt.close()

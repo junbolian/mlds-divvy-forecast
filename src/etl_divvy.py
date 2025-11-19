@@ -2,6 +2,8 @@ import argparse
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List
+import pandas as pd
+import os
 
 import requests
 from dateutil import parser as date_parser
@@ -234,9 +236,26 @@ def run_single_snapshot() -> None:
 
     print("Fetching Divvy snapshot from API...")
     raw = fetch_divvy_snapshot()
+    os.makedirs("data/snapshots", exist_ok=True)
+
+    stations_df = pd.DataFrame(raw["network"]["stations"])
+    stations_df.to_csv(f"data/snapshots/snapshot_{datetime.now().isoformat()}.csv", index=False)
 
     print("Transforming data...")
     transformed = transform_stations(raw)
+    os.makedirs("data/transformed", exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    pd.DataFrame(transformed["stations_dim_rows"]).to_csv(
+        f"data/transformed/dim_station_{timestamp}.csv",
+        index=False
+    )
+
+    pd.DataFrame(transformed["status_fact_rows"]).to_csv(
+        f"data/transformed/fact_station_status_{timestamp}.csv",
+        index=False
+    )
 
     print("Loading into PostgreSQL...")
     load_into_db(
