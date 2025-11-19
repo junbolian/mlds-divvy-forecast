@@ -406,3 +406,4 @@ mlds-divvy-forecast/
 - Processing: timestamp normalization, capacity estimation, and occupancy computation create consistent inputs for downstream analytics.
 - Models: the status rules and expected demand index are transparent and directly tied to the data; they can be replaced or extended later without changing the database design.
 - Visualization: the interactive map provides an immediate, intuitive check that the pipeline works and that the definitions of status and demand are reasonable in practice.
+- Limitation: The Folium map is static HTML. To refresh the data, the pipeline must be re-run.
