@@ -374,7 +374,8 @@ mlds-divvy-forecast/
 │
 ├── src/                   # Application source code
 │   ├── analysis/          # Exploratory Data Analysis scripts
-│   │   └── EDA.py
+│   │   ├── EDA.py
+│   │     └── __init__.py
 │   ├── analytics.py       # status summary and expected demand index computation.
 │   ├── etl_divvy.py       # ETL pipeline from API to PostgreSQL.
 │   ├── map_divvy.py       # interactive map generation.
@@ -387,9 +388,12 @@ mlds-divvy-forecast/
 │   └── dags/
 │       └── divvy_dag.py
 │
-├── outputs/               # Generated results (ignored by git)
-│   ├── *.png              # EDA plots
-│   └── divvy_map.html     # Interaction station map
+├── data/                  # Generated results (ignored by git)
+│   ├── outputs/
+│   │   ├── *.png          # EDA plots
+│   │   └── divvy_map.html # Interaction station map       
+│   ├── snapshots/         # raw dataset
+│   └── transformed/       # transformed dataset
 │
 ├── Dockerfile             # App container definition
 ├── requirements.txt       # Python dependency list.
