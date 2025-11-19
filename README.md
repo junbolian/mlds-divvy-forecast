@@ -226,7 +226,7 @@ Open the file in a browser to see the current station states and demand indices 
 ### 4.6 Exploratory Data Analysis (EDA)
 
 ```bash
-docker compose exec app python src/analysis/EDA.py
+docker compose exec app python -m src.analysis.EDA
 ```
 
 Outputs saved to:
