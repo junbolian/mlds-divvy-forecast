@@ -1,4 +1,9 @@
+version: "3.9"
+
 services:
+  # ----------------------------
+  # PostgreSQL (Shared by App + Airflow)
+  # ----------------------------
   db:
     image: postgres:16
     container_name: divvy_postgres
@@ -10,7 +15,14 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U divvy -d divvy" ]
+      interval: 5s
+      retries: 5
 
+  # ----------------------------
+  # Python Application Container
+  # ----------------------------
   app:
     build: .
     container_name: divvy_app
@@ -26,8 +38,66 @@ services:
     working_dir: /app
     volumes:
       - .:/app
-    # Keep container alive; commands are run via `docker compose exec app ...`
     command: ["sleep", "infinity"]
+
+  # ----------------------------
+  # Airflow Init (Runs Once)
+  # ----------------------------
+  airflow-init:
+    image: apache/airflow:2.9.1
+    container_name: airflow_init
+    depends_on:
+      - db
+    restart: "no"
+    environment:
+      AIRFLOW_UID: 50000
+      AIRFLOW_GID: 0
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://divvy:divvy@db:5432/divvy
+    volumes:
+      - ./airflow:/opt/airflow
+    command: >
+      bash -c "airflow db init && airflow users create 
+      --username admin --password admin 
+      --firstname Admin --lastname User 
+      --role Admin --email admin@example.com"
+
+  # ----------------------------
+  # Airflow Webserver UI
+  # ----------------------------
+  airflow-webserver:
+    image: apache/airflow:2.9.1
+    container_name: airflow_webserver
+    depends_on:
+      - airflow-init
+    environment:
+      AIRFLOW_UID: 50000
+      AIRFLOW_GID: 0
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://divvy:divvy@db:5432/divvy
+    volumes:
+      - ./airflow:/opt/airflow
+    ports:
+      - "8080:8080"
+    command: webserver
+
+  # ----------------------------
+  # Airflow Scheduler
+  # ----------------------------
+  airflow-scheduler:
+    image: apache/airflow:2.9.1
+    container_name: airflow_scheduler
+    depends_on:
+      - airflow-webserver
+    environment:
+      AIRFLOW_UID: 50000
+      AIRFLOW_GID: 0
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://divvy:divvy@db:5432/divvy
+    volumes:
+      - ./airflow:/opt/airflow
+    command: scheduler
 
 volumes:
   pgdata:

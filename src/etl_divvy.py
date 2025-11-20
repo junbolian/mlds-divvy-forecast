@@ -2,6 +2,8 @@ import argparse
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List
+import pandas as pd
+import os
 
 import requests
 from dateutil import parser as date_parser
@@ -12,7 +14,9 @@ from .config import DIVVY_API_URL, EMPTY_THRESHOLD, FULL_THRESHOLD
 from .db import engine
 from .models import dim_station, fact_station_status, create_tables
 
-
+# ----------------------------------------------------------------------
+# Fetch API data
+# ----------------------------------------------------------------------
 def fetch_divvy_snapshot() -> Dict[str, Any]:
     """
     Call the Citybikes Divvy endpoint and return the parsed JSON.
@@ -25,7 +29,9 @@ def fetch_divvy_snapshot() -> Dict[str, Any]:
     data = response.json()
     return data
 
-
+# ----------------------------------------------------------------------
+# Timestamp parsing
+# ----------------------------------------------------------------------
 def parse_timestamp(ts_str: str) -> datetime:
     """
     Parse timestamp string from API into a timezone-aware datetime.
@@ -61,8 +67,9 @@ def parse_timestamp(ts_str: str) -> datetime:
 
     return dt
 
-
-
+# ----------------------------------------------------------------------
+# Classification logic
+# ----------------------------------------------------------------------
 def classify_status(
     free_bikes: int,
     empty_slots: int,
@@ -71,14 +78,16 @@ def classify_status(
     returning: int,
 ) -> str:
     """
-    Classify station status into:
-    'offline', 'empty', 'normal', 'full', or 'unknown'.
+    Classify station operational status.
 
-    Business logic:
-    - If renting == 0 and returning == 0 -> offline
-    - Else use occupancy ratio and the 20% / 80% thresholds.
+    Rules:
+    - If both renting and returning are 0 → the dock is offline.
+    - Otherwise classify using occupancy ratio and thresholds:
+        <= 20% full → empty
+        >= 80% full → full
+        otherwise   → normal
     """
-    # Offline: not renting and not returning
+    # No rentals/returns → API says station is "offline"
     if renting == 0 and returning == 0:
         return "offline"
 
@@ -93,7 +102,9 @@ def classify_status(
         return "full"
     return "normal"
 
-
+# ----------------------------------------------------------------------
+# Transform API JSON into dim + fact tables
+# ----------------------------------------------------------------------
 def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     """
     Transform raw API JSON into two lists:
@@ -123,13 +134,13 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
             ts = datetime.utcnow()
 
         # 2) capacity: prefer extra["slots"]; fallback to free + empty
+        # This dataset is inconsistent: sometimes "extra['slots']" exists,
+        # sometimes only free_bikes + empty_slots is accurate.
         slots = extra.get("slots")
-        # 2) capacity: always free_bikes + empty_slots
         fb = free_bikes if isinstance(free_bikes, int) and free_bikes >= 0 else 0
         es = empty_slots if isinstance(empty_slots, int) and empty_slots >= 0 else 0
         
         capacity = fb + es if (free_bikes is not None and empty_slots is not None) else None
-
 
         # renting / returning flags (default to 1 if missing)
         renting = int(extra.get("renting", 1) or 1)
@@ -144,7 +155,7 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
             returning=returning,
         )
 
-        # 4) dim_station row
+        # 4) dim_station row(station metadata)
         stations_dim_rows.append(
             {
                 "station_id": station_id,
@@ -157,7 +168,6 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
         )
 
         # 5) fact_station_status row
-        
         status_fact_rows.append(
             {
                 "station_id": station_id,
@@ -166,7 +176,7 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
                 "empty_slots": empty_slots,
                 "capacity": capacity,  
                 "occupancy_ratio": (
-                    float(free_bikes) / capacity if capacity not in (None, 0) else None
+                    float(fb) / capacity if capacity not in (None, 0) else None
                 ),
                 "status_label": status_label,
                 # Keep all extra info for future use
@@ -180,7 +190,9 @@ def transform_stations(raw: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
         "status_fact_rows": status_fact_rows,
     }
 
-
+# ----------------------------------------------------------------------
+# Load step
+# ----------------------------------------------------------------------
 def load_into_db(
     stations_dim_rows: List[Dict[str, Any]],
     status_fact_rows: List[Dict[str, Any]],
@@ -208,19 +220,42 @@ def load_into_db(
         if status_fact_rows:
             conn.execute(insert(fact_station_status), status_fact_rows)
 
-
+# ----------------------------------------------------------------------
+# One complete ETL cycle
+# ----------------------------------------------------------------------
 def run_single_snapshot() -> None:
     """
-    Run one ETL snapshot: fetch -> transform -> load.
+    Execute one complete ETL snapshot:
+        1) Create tables (if needed)
+        2) Fetch API data
+        3) Transform into structured rows
+        4) Load into PostgreSQL
     """
     print("Creating tables if needed...")
     create_tables()
 
     print("Fetching Divvy snapshot from API...")
     raw = fetch_divvy_snapshot()
+    os.makedirs("data/snapshots", exist_ok=True)
+
+    stations_df = pd.DataFrame(raw["network"]["stations"])
+    stations_df.to_csv(f"data/snapshots/snapshot_{datetime.now().isoformat()}.csv", index=False)
 
     print("Transforming data...")
     transformed = transform_stations(raw)
+    os.makedirs("data/transformed", exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    pd.DataFrame(transformed["stations_dim_rows"]).to_csv(
+        f"data/transformed/dim_station_{timestamp}.csv",
+        index=False
+    )
+
+    pd.DataFrame(transformed["status_fact_rows"]).to_csv(
+        f"data/transformed/fact_station_status_{timestamp}.csv",
+        index=False
+    )
 
     print("Loading into PostgreSQL...")
     load_into_db(
@@ -230,7 +265,9 @@ def run_single_snapshot() -> None:
 
     print("ETL snapshot complete.")
 
-
+# ----------------------------------------------------------------------
+# CLI entry point
+# ----------------------------------------------------------------------
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Divvy ETL: fetch live data from Citybikes API into PostgreSQL."

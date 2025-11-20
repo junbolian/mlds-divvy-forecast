@@ -11,6 +11,7 @@ def summarize_current_status() -> None:
     Print summary of the latest status per station:
     counts of empty / normal / full / offline / unknown.
     """
+    # Query picks the latest record for each station using DISTINCT ON
     query = text(
         """
         SELECT DISTINCT ON (station_id)
@@ -23,6 +24,7 @@ def summarize_current_status() -> None:
         """
     )
 
+    # Counters for each possible station status
     counts = {
         "empty": 0,
         "normal": 0,
@@ -31,17 +33,22 @@ def summarize_current_status() -> None:
         "unknown": 0,
     }
 
+    # Execute query and fetch latest status rows
     with engine.connect() as conn:
         result = conn.execute(query)
         rows = result.fetchall()
 
     print(f"Latest status for {len(rows)} stations:")
+
+    # Tally the counts by status label
     for row in rows:
+        # If status_label is None or unexpected, count it as "unknown"
         label = row.status_label or "unknown"
         if label not in counts:
             label = "unknown"
         counts[label] += 1
 
+    # Pretty-print the aggregated counts
     print("Status counts:")
     for label, cnt in counts.items():
         print(f"  {label:7s}: {cnt}")
@@ -51,8 +58,11 @@ def classify_ratio(ratio: float | None) -> str:
     """
     Classify occupancy ratio into empty / normal / full / unknown.
     """
+    # Missing or NULL ratio → unknown
     if ratio is None:
         return "unknown"
+
+    # Compare ratio against configurable thresholds
     if ratio <= EMPTY_THRESHOLD:
         return "empty"
     if ratio >= FULL_THRESHOLD:
@@ -70,6 +80,7 @@ def predict_next_by_last_hour(window_minutes: int = 60) -> None:
     now_utc = datetime.now(timezone.utc)
     window_start = now_utc - timedelta(minutes=window_minutes)
 
+    # Aggregate average occupancy per station over the time window
     query = text(
         """
         SELECT station_id,
@@ -80,19 +91,24 @@ def predict_next_by_last_hour(window_minutes: int = 60) -> None:
         """
     )
 
+    # Execute time-windowed average occupancy query
     with engine.connect() as conn:
         result = conn.execute(query, {"window_start": window_start})
         rows = result.fetchall()
 
     print(f"\nNaive prediction based on last {window_minutes} minutes:")
+
+    # Compute predicted demand & classify status for each station
     for row in rows:
         station_id = row.station_id
         avg_occ = float(row.avg_occ) if row.avg_occ is not None else None
 
         if avg_occ is not None:
+            # Demand index is inverse of occupancy (bounded 0–1)
             demand_index = max(0.0, min(1.0, 1.0 - avg_occ))
             label = classify_ratio(avg_occ)
         else:
+            # Not enough data → unknown
             demand_index = None
             label = "unknown"
 
@@ -105,6 +121,7 @@ def predict_next_by_last_hour(window_minutes: int = 60) -> None:
 
 
 def main() -> None:
+    # Run both summary and prediction routines
     summarize_current_status()
     predict_next_by_last_hour(window_minutes=60)
 
