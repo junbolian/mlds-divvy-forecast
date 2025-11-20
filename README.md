@@ -27,13 +27,13 @@ Shows live station status, occupancy, and demand index.
 
 Identifies stations that remain consistently full.
 
-<img src="images/top10.png" width="450">
+<img src="images/top10.png" width="650">
 
 **3. Free Bikes Distribution**
 
 A histogram showing the imbalance of available bikes across the system.
 
-<img src="images/free_bikes.png" width="450">
+<img src="images/free_bikes.png" width="650">
 
 ## 1. Data Source
 
