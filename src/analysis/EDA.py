@@ -12,14 +12,41 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sqlalchemy import create_engine
+import io
 
 
 engine = create_engine(DATABASE_URL)
 stations = pd.read_sql("SELECT * FROM dim_station", engine)
 statuses = pd.read_sql("SELECT * FROM fact_station_status", engine)
 
-stations.info()
-statuses.info()
+
+
+def info_to_df(df):
+    buffer = io.StringIO()
+    df.info(buf=buffer)
+    info_str = buffer.getvalue().splitlines()
+
+    rows = []
+    # Skip header lines; extract only column lines
+    for line in info_str[5:-2]:
+        parts = line.split()
+        # Format:
+        # #  ColumnName  Non-Null-Count  Dtype
+        col = parts[1]
+        non_null = parts[2]
+        dtype = parts[-1]
+        rows.append([col, non_null, dtype])
+
+    return pd.DataFrame(rows, columns=["Column", "Non-Null Count", "Dtype"])
+
+print("Stations Table Info:")
+print(info_to_df(stations))
+
+print("\nStatuses Table Info:")
+print(info_to_df(statuses))
+
+
+
 
 
 # Detect if running inside Docker: check for known file
@@ -140,4 +167,28 @@ variability.head(10).plot(kind="barh", title="Most Volatile Stations (Occupancy 
 
 plt.tight_layout(pad=2.0)
 plt.savefig(os.path.join(OUTPUT_DIR, "Most_Volatile_Stations.png"), dpi=300, bbox_inches='tight')
+plt.close()
+
+
+
+# ----------------------------------------------------------------------
+# EDA 6: Identify Overall Station Status Distribution
+# ----------------------------------------------------------------------
+status_counts = df["status_label"].value_counts()
+explode = [0.05] + [0]* (len(status_counts)-1)
+
+plt.figure(figsize=(6, 6))
+plt.pie(
+    status_counts,
+    labels=status_counts.index,
+    autopct="%1.1f%%",
+    startangle=140,
+    colors=sns.color_palette("Set2"),
+    explode=explode
+)
+
+plt.title("Overall Station Status Distribution")
+plt.tight_layout()
+
+plt.savefig(os.path.join(OUTPUT_DIR, "Station_Status_Distribution.png"), dpi=300)
 plt.close()
