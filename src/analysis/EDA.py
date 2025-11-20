@@ -10,7 +10,7 @@ from src.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 # Visualization + Analysis Libraries
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sqlalchemy import create_engine
+import pandas as pd
 import io
 
 # Database Connector
@@ -46,17 +46,11 @@ def info_to_df(df):
 
     return pd.DataFrame(rows, columns=["Column", "Non-Null Count", "Dtype"])
 
-print("Stations Table Info:")
+print("\nStations Table Info:")
 print(info_to_df(stations))
 
 print("\nStatuses Table Info:")
 print(info_to_df(statuses))
-
-
-
-
-print("\n--- Status Table Info ---")
-statuses.info()
 
 # ----------------------------------------------------------------------
 # Detect whether running inside Docker (affects output directory)
@@ -75,60 +69,11 @@ else:
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Saving plots to: {OUTPUT_DIR}")
 
-# ----------------------------------------------------------------------
 # Join fact + dimension tables
-# ----------------------------------------------------------------------
 df = statuses.merge(stations, on="station_id", how="left")
 
 # ----------------------------------------------------------------------
-# EDA 1: Top 10 Stations by Average Occupancy
-# ----------------------------------------------------------------------
-# Compute mean occupancy per station
-station_rank = (
-    df.groupby(["station_id", "name"])["occupancy_ratio"]
-      .mean()
-      .reset_index()
-      .rename(columns={"occupancy_ratio": "avg_occupancy"})
-      .sort_values("avg_occupancy", ascending=False)
-      .reset_index(drop=True)
-)
-
-# Drop stations with no occupancy data (NaN)
-station_rank = station_rank.dropna(subset=["avg_occupancy"])
-
-# Add rank column
-station_rank["rank"] = station_rank["avg_occupancy"].rank(
-    ascending=False, method="dense"
-).astype(int)
-
-# Plot Top 10 stations
-top10 = station_rank.head(10)
-
-# Wrap long names for readability
-labels = [textwrap.fill(name, width=30) for name in top10["name"]]
-
-plt.figure(figsize=(13, 7))
-
-# Using a clearer gradient (Blues reversed)
-colors = sns.color_palette("Blues_r", n_colors=len(top10))
-
-plt.barh(labels, top10["avg_occupancy"], color=colors)
-plt.gca().invert_yaxis()  # Show highest occupancy at the top
-
-# Add numeric labels next to each bar
-for i, value in enumerate(top10["avg_occupancy"]):
-    plt.text(value + 0.01, i, f"{value:.2f}", va="center", fontsize=10)
-
-plt.title("Top 10 Stations by Average Occupancy Ratio\n(Based on Live Snapshot Collection)", fontsize=16)
-plt.xlabel("Average Occupancy Ratio", fontsize=12)
-plt.ylabel("")  # remove y-axis label for cleaner look
-
-plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "top_10_Stations_by_Average_Occupancy_Ratio.png"), dpi=300)
-plt.close()
-
-# ----------------------------------------------------------------------
-# EDA 2: Region Classification (North/South/East/West Chicago)
+# Region Classification (North/South/East/West Chicago)
 # ----------------------------------------------------------------------
 MADISON_LAT = 41.8820  # Boundary between North Side & South Side
 STATE_LON = -87.6278   # Boundary between East Side & West Side
@@ -155,7 +100,47 @@ stations["region"] = stations.apply(
 df = statuses.merge(stations, on="station_id", how="left")
 
 # ----------------------------------------------------------------------
-# EDA 3: Average Occupancy by Chicago Region
+# EDA 1: Top 10 Stations by Average Occupancy
+# ----------------------------------------------------------------------
+# Compute mean occupancy per station
+df = df[df["capacity"] > 5]
+
+station_rank = (
+    df.groupby(["station_id", "name"])["occupancy_ratio"]
+      .mean()
+      .reset_index()
+      .rename(columns={"occupancy_ratio": "avg_occupancy"})
+      .sort_values("avg_occupancy", ascending=False)
+)
+
+station_rank = station_rank.dropna()
+top10 = station_rank.head(10)
+
+# Wrap long names for readability
+labels = [textwrap.fill(name, width=30) for name in top10["name"]]
+plt.figure(figsize=(13, 7))
+
+# Add numeric labels next to each bar
+for i, value in enumerate(top10["avg_occupancy"]):
+    plt.text(value + 0.01, i, f"{value:.2f}", va="center", fontsize=10)
+
+# Using a clearer gradient (Blues reversed)
+colors = sns.color_palette("Blues_r", n_colors=len(top10))
+plt.barh(labels, top10["avg_occupancy"], color=colors)
+plt.gca().invert_yaxis()
+
+plt.title("Top 10 Stations by Average Occupancy Ratio\n(Based on Live Snapshot Collection)",
+          fontsize=16)
+plt.xlim(top10["avg_occupancy"].min() * 0.95, top10["avg_occupancy"].max() * 1.05)
+plt.xlabel("Average Occupancy Ratio", fontsize=12)
+plt.ylabel("")
+plt.tight_layout(pad=2.0)
+
+plt.savefig(os.path.join(OUTPUT_DIR, "top_10_Stations_by_Average_Occupancy_Ratio.png"), dpi=300)
+plt.close()
+
+# ----------------------------------------------------------------------
+# EDA 2: Average Occupancy by Chicago Region
 # ----------------------------------------------------------------------
 region_stats = (
     df.groupby("region")["occupancy_ratio"]
@@ -184,7 +169,7 @@ plt.savefig(os.path.join(OUTPUT_DIR, "Average_Occupancy_Ratio_by_Chicago_Region.
 plt.close()
 
 # ----------------------------------------------------------------------
-# EDA 4: Distribution of Free Bikes
+# EDA 3: Distribution of Free Bikes
 # ----------------------------------------------------------------------
 plt.figure(figsize=(13, 7))
 
@@ -204,32 +189,38 @@ plt.savefig(
 plt.close()
 
 # ----------------------------------------------------------------------
-# EDA 5: Identify Most Volatile (Unstable) Stations
+# EDA 4: Identify Most Volatile (Unstable) Stations
 # ----------------------------------------------------------------------
 # Compute standard deviation of occupancy ratio per station
 variability = (
     df.groupby("name")["occupancy_ratio"]
       .std()
+      .dropna()
       .sort_values(ascending=False)
       .head(10)
 )
 
 # Convert index to list and wrap long station names
 labels = [textwrap.fill(station, width=35) for station in variability.index]
-
 plt.figure(figsize=(12, 7))
 
-# Use a gradient color based on magnitude of volatility
-colors = sns.color_palette("Reds", n_colors=len(variability))
+for i, v in enumerate(variability.values):
+    plt.text(v + 0.01, i, f"{v:.2f}", va="center", fontsize=10)
 
+# Use a gradient color based on magnitude of volatility
+colors = sns.light_palette("red", n_colors=len(variability), reverse=True)
+plt.barh(labels, variability.values, color=colors)
+
+plt.gca().invert_yaxis()
+plt.title("Most Volatile Stations (Occupancy Std Dev)")
+plt.xlabel("Standard Deviation of Occupancy Ratio")
 plt.tight_layout(pad=2.0)
+
 plt.savefig(os.path.join(OUTPUT_DIR, "Most_Volatile_Stations.png"), dpi=300, bbox_inches='tight')
 plt.close()
 
-
-
 # ----------------------------------------------------------------------
-# EDA 6: Identify Overall Station Status Distribution
+# EDA 5: Identify Overall Station Status Distribution
 # ----------------------------------------------------------------------
 status_counts = df["status_label"].value_counts()
 explode = [0.05] + [0]* (len(status_counts)-1)
