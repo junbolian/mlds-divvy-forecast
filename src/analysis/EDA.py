@@ -10,7 +10,8 @@ from src.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 # Visualization + Analysis Libraries
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pandas as pd
+from sqlalchemy import create_engine
+import io
 
 # Database Connector
 from sqlalchemy import create_engine
@@ -25,8 +26,34 @@ engine = create_engine(DATABASE_URL)
 stations = pd.read_sql("SELECT * FROM dim_station", engine)
 statuses = pd.read_sql("SELECT * FROM fact_station_status", engine)
 
-print("\n--- Station Table Info ---")
-stations.info()
+
+
+def info_to_df(df):
+    buffer = io.StringIO()
+    df.info(buf=buffer)
+    info_str = buffer.getvalue().splitlines()
+
+    rows = []
+    # Skip header lines; extract only column lines
+    for line in info_str[5:-2]:
+        parts = line.split()
+        # Format:
+        # #  ColumnName  Non-Null-Count  Dtype
+        col = parts[1]
+        non_null = parts[2]
+        dtype = parts[-1]
+        rows.append([col, non_null, dtype])
+
+    return pd.DataFrame(rows, columns=["Column", "Non-Null Count", "Dtype"])
+
+print("Stations Table Info:")
+print(info_to_df(stations))
+
+print("\nStatuses Table Info:")
+print(info_to_df(statuses))
+
+
+
 
 print("\n--- Status Table Info ---")
 statuses.info()
@@ -195,26 +222,10 @@ plt.figure(figsize=(12, 7))
 # Use a gradient color based on magnitude of volatility
 colors = sns.color_palette("Reds", n_colors=len(variability))
 
-plt.barh(labels, variability.values, color=colors)
-
-plt.gca().invert_yaxis()  # Highest volatility at the top
-
-plt.title("Top 10 Most Volatile Divvy Stations\n(Highest Occupancy Variability)", fontsize=16)
-plt.xlabel("Occupancy Standard Deviation", fontsize=12)
-plt.ylabel("")  # remove noisy “name” label
-
-# Add numerical value to each bar
-for i, value in enumerate(variability.values):
-    plt.text(value + 0.01, i, f"{value:.3f}", va="center", fontsize=10)
-
-plt.tight_layout()
-
-plt.savefig(
-    os.path.join(OUTPUT_DIR, "Most_Volatile_Stations.png"),
-    dpi=300,
-    bbox_inches='tight'
-)
+plt.tight_layout(pad=2.0)
+plt.savefig(os.path.join(OUTPUT_DIR, "Most_Volatile_Stations.png"), dpi=300, bbox_inches='tight')
 plt.close()
+
 
 
 # ----------------------------------------------------------------------
