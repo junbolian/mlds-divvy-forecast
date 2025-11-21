@@ -12,7 +12,6 @@ venv/
 .idea/
 
 # Outputs (generated artifacts)
-outputs/
 data/
 
 # Docker junk

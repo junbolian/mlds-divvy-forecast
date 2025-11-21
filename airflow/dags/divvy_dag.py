@@ -1,19 +1,5 @@
-# airflow/dags/divvy_dag.py
-
-"""
-Airflow DAG for automating the Divvy ETL pipeline.
-
-This DAG is designed for a DOCKER-BASED project.
-Unlike virtualenv workflows, we do NOT activate a .venv
-because Airflow runs inside its own container and your project code is mounted
-at /app via docker-compose volumes.
-
-Airflow simply executes the ETL script inside its container environment
-using the shared /app/src package.
-"""
-
 import sys
-sys.path.append("/app")  # Allow Airflow to import src/
+sys.path.append("/app")  # allow importing src/
 
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -23,20 +9,41 @@ default_args = {
     "owner": "airflow",
     "depends_on_past": False,
     "retries": 1,
-    "retry_delay": timedelta(minutes=5),
+    "retry_delay": timedelta(minutes=3),
 }
 
 with DAG(
-    dag_id="divvy_dag",
+    dag_id="divvy_live_pipeline",
     default_args=default_args,
-    schedule="@hourly",    # ← modern Airflow syntax
     start_date=datetime(2024, 1, 1),
+    schedule="@hourly",      # run pipeline every hour
     catchup=False,
+    description="Live Divvy ETL Pipeline using CityBikes API",
 ) as dag:
 
-    run_etl = BashOperator(
-        task_id="run_etl_snapshot",
-        bash_command="python3 -u -m src.etl_divvy --snapshots 12 --sleep 300",
+    # ---------------------------------------------------
+    # 1. FETCH Snapshot (live API call)
+    # ---------------------------------------------------
+    fetch_snapshot = BashOperator(
+        task_id="fetch_snapshot",
+        bash_command="python3 -u -m src.etl_divvy --mode fetch --snapshots 12 --sleep 300",
     )
 
-run_etl
+    # ---------------------------------------------------
+    # 2. TRANSFORM Snapshot (cleaning + occupancy + status)
+    # ---------------------------------------------------
+    transform_snapshot = BashOperator(
+        task_id="transform_snapshot",
+        bash_command="python3 -u -m src.etl_divvy --mode transform",
+    )
+
+    # ---------------------------------------------------
+    # 3. LOAD Snapshot (insert into Postgres)
+    # ---------------------------------------------------
+    load_snapshot = BashOperator(
+        task_id="load_snapshot",
+        bash_command="python3 -u -m src.etl_divvy --mode load",
+    )
+
+    # FINAL DAG CHAIN
+    fetch_snapshot >> transform_snapshot >> load_snapshot

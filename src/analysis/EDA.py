@@ -27,7 +27,6 @@ stations = pd.read_sql("SELECT * FROM dim_station", engine)
 statuses = pd.read_sql("SELECT * FROM fact_station_status", engine)
 
 
-
 def info_to_df(df):
     buffer = io.StringIO()
     df.info(buf=buffer)
@@ -111,6 +110,11 @@ station_rank = (
       .reset_index()
       .rename(columns={"occupancy_ratio": "avg_occupancy"})
       .sort_values("avg_occupancy", ascending=False)
+)
+
+# Clean up long prefix
+station_rank["name"] = station_rank["name"].str.replace(
+    r"^Public Rack\s*-\s*", "", regex=True
 )
 
 station_rank = station_rank.dropna()
